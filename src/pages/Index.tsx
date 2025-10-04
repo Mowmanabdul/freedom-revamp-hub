@@ -9,6 +9,7 @@ import { CompletedQuestLog } from '@/components/CompletedQuestLog';
 import { Analytics } from '@/components/Analytics';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sword, ScrollText, Store, Sparkles, BarChart3 } from 'lucide-react';
+import { ModeToggle } from '@/components/mode-toggle';
 
 const Index = () => {
   return (
@@ -16,11 +17,14 @@ const Index = () => {
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 pb-safe">
         {/* Header */}
         <header className="sticky top-0 z-10 backdrop-blur-md bg-background/80 border-b border-primary/20 px-4 py-4">
-          <div className="container mx-auto">
-            <h1 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-gradient">
-              QuestLog RPG
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">Level up your life, one quest at a time</p>
+          <div className="container mx-auto flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-gradient">
+                QuestLog RPG
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">Level up your life, one quest at a time</p>
+            </div>
+            <ModeToggle />
           </div>
         </header>
 
