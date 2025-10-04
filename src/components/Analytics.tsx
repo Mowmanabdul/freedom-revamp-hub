@@ -1,247 +1,253 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BarChart, LineChart, PieChart, TrendingUp, Activity, Target } from 'lucide-react';
+import {
+  Bar,
+  BarChart as RechartsBarChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  Line,
+  LineChart as RechartsLineChart,
+  Pie,
+  PieChart as RechartsPieChart,
+  Cell,
+} from 'recharts';
 import { useQuest } from '@/contexts/QuestContext';
-import { BarChart3, PieChart, TrendingUp, Clock } from 'lucide-react';
-import { useMemo } from 'react';
+import { DatePickerWithRange } from '@/components/ui/date-range-picker';
+import { useMemo, useState } from 'react';
+import { DateRange } from 'react-day-picker';
+import { addDays, isWithinInterval, format, differenceInDays, startOfDay } from 'date-fns';
+import { useTheme } from 'next-themes';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export const Analytics = () => {
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
+const NoDataPlaceholder = () => (
+  <div className="text-center py-8 text-muted-foreground">
+    <p className="text-sm">No data for this period</p>
+    <p className="text-xs mt-1">Complete some quests to see your stats!</p>
+  </div>
+);
+
+export function Analytics() {
   const { state } = useQuest();
-  const { completedQuests, skills, player } = state;
+  const { theme } = useTheme();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: addDays(new Date(), -7),
+    to: new Date(),
+  });
 
-  const categoryStats = useMemo(() => {
-    const stats: Record<string, number> = {};
-    completedQuests.forEach((quest) => {
-      stats[quest.category] = (stats[quest.category] || 0) + 1;
+  const filteredQuests = useMemo(() => {
+    return state.completedQuests.filter((quest) => {
+      if (!dateRange?.from || !dateRange?.to || !quest.completedAt) return false;
+      return isWithinInterval(new Date(quest.completedAt), {
+        start: dateRange.from,
+        end: dateRange.to,
+      });
     });
-    return Object.entries(stats).sort((a, b) => b[1] - a[1]);
-  }, [completedQuests]);
+  }, [state.completedQuests, dateRange]);
 
-  const last7Days = useMemo(() => {
-    const days: Record<string, number> = {};
-    const now = new Date();
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      const key = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      days[key] = 0;
-    }
+  const { questCompletionData, xpGainedData, categoryData, totalXpGained } = useMemo(() => {
+    const dailyData: { [key: string]: { date: number; completed: number; xp: number } } = {};
+    const categoryCounts: { [key: string]: number } = {};
+    let totalXp = 0;
 
-    completedQuests.forEach((quest) => {
+    for (const quest of filteredQuests) {
       if (quest.completedAt) {
-        const date = new Date(quest.completedAt);
-        const key = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        if (days[key] !== undefined) {
-          days[key]++;
+        const dateKey = startOfDay(new Date(quest.completedAt)).getTime();
+        if (!dailyData[dateKey]) {
+          dailyData[dateKey] = { date: dateKey, completed: 0, xp: 0 };
         }
+        dailyData[dateKey].completed += 1;
+        dailyData[dateKey].xp += quest.xp;
+
+        categoryCounts[quest.category] = (categoryCounts[quest.category] || 0) + 1;
+        totalXp += quest.xp;
       }
-    });
-
-    return Object.entries(days);
-  }, [completedQuests]);
-
-  const hourlyStats = useMemo(() => {
-    const hours: Record<number, number> = {};
-    for (let i = 0; i < 24; i++) {
-      hours[i] = 0;
     }
 
-    completedQuests.forEach((quest) => {
-      if (quest.completedAt) {
-        const hour = new Date(quest.completedAt).getHours();
-        hours[hour]++;
-      }
-    });
+    const sortedDailyData = Object.values(dailyData).sort((a, b) => a.date - b.date);
 
-    const maxCount = Math.max(...Object.values(hours), 1);
-    return Object.entries(hours).map(([hour, count]) => ({
-      hour: parseInt(hour),
-      count,
-      intensity: (count / maxCount) * 100,
-    }));
-  }, [completedQuests]);
+    return {
+      questCompletionData: sortedDailyData.map(d => ({ ...d, date: format(d.date, 'MMM d') })),
+      xpGainedData: sortedDailyData.map(d => ({ ...d, date: format(d.date, 'MMM d') })),
+      categoryData: Object.entries(categoryCounts).map(([name, value]) => ({ name, value })),
+      totalXpGained: totalXp,
+    };
+  }, [filteredQuests]);
 
-  const topSkills = useMemo(() => {
-    return Object.values(skills)
-      .sort((a, b) => b.level - a.level)
-      .slice(0, 5);
-  }, [skills]);
+  const tickColor = theme === 'dark' ? '#e5e7eb' : '#4b5563';
 
-  const maxInLast7Days = Math.max(...last7Days.map(([, count]) => count), 1);
+  const totalQuestsCompleted = filteredQuests.length;
+  const days = dateRange?.from && dateRange?.to ? differenceInDays(dateRange.to, dateRange.from) + 1 : 1;
+  const averageQuestsPerDay = totalQuestsCompleted > 0 ? (totalQuestsCompleted / days).toFixed(1) : '0.0';
 
   return (
     <div className="space-y-6">
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="backdrop-blur-sm bg-card/80 border-primary/20">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-xp">{player.questsCompleted}</div>
-            <div className="text-xs text-muted-foreground">Total Quests</div>
-          </CardContent>
-        </Card>
-        <Card className="backdrop-blur-sm bg-card/80 border-primary/20">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-gold">{Math.round(player.totalGoldEarned)}</div>
-            <div className="text-xs text-muted-foreground">Gold Earned</div>
-          </CardContent>
-        </Card>
-        <Card className="backdrop-blur-sm bg-card/80 border-primary/20">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-accent">{Math.round(player.totalXpGained)}</div>
-            <div className="text-xs text-muted-foreground">Total XP</div>
-          </CardContent>
-        </Card>
-        <Card className="backdrop-blur-sm bg-card/80 border-primary/20">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-streak">{player.streak}</div>
-            <div className="text-xs text-muted-foreground">Day Streak</div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          Analytics
+        </h2>
+        <DatePickerWithRange onDateChange={setDateRange} />
       </div>
+      
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">
+            <Activity className="w-4 h-4 mr-2" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="trends">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Trends
+          </TabsTrigger>
+          <TabsTrigger value="breakdown">
+            <PieChart className="w-4 h-4 mr-2" />
+            Breakdown
+          </TabsTrigger>
+        </TabsList>
 
-      {/* 7-Day Activity */}
-      <Card className="backdrop-blur-sm bg-card/80 border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            7-Day Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {last7Days.map(([day, count]) => (
-              <div key={day} className="flex items-center gap-3">
-                <div className="w-16 text-xs text-muted-foreground">{day}</div>
-                <div className="flex-1 bg-secondary rounded-full h-6 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-primary to-accent rounded-full flex items-center px-2 transition-all"
-                    style={{ width: `${(count / maxInLast7Days) * 100}%`, minWidth: count > 0 ? '2rem' : '0' }}
-                  >
-                    {count > 0 && <span className="text-xs font-semibold">{count}</span>}
-                  </div>
-                </div>
-              </div>
-            ))}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Quests Completed</CardTitle>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalQuestsCompleted}</div>
+                <p className="text-xs text-muted-foreground">in the selected period</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total XP Gained</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalXpGained.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">from completed quests</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Daily Average</CardTitle>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{averageQuestsPerDay}</div>
+                <p className="text-xs text-muted-foreground">quests completed per day</p>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+          <Card className="lg:col-span-3">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                <BarChart className="w-4 h-4" />
+                Quest Completion Trend
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {questCompletionData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <RechartsBarChart data={questCompletionData}>
+                    <XAxis dataKey="date" stroke={tickColor} fontSize={12} />
+                    <YAxis stroke={tickColor} fontSize={12} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: theme === 'dark' ? '#1f2937' : '#f9fafb',
+                        borderColor: theme === 'dark' ? '#374151' : '#e5e7eb',
+                      }}
+                    />
+                    <Bar dataKey="completed" fill="hsl(var(--primary))" name="Quests Completed" />
+                  </RechartsBarChart>
+                </ResponsiveContainer>
+              ) : (
+                <NoDataPlaceholder />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Category Distribution */}
-      <Card className="backdrop-blur-sm bg-card/80 border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <PieChart className="w-5 h-5 text-accent" />
-            Quest Categories
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {categoryStats.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground text-sm">
-              No data yet
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {categoryStats.map(([category, count]) => {
-                const percentage = (count / completedQuests.length) * 100;
-                return (
-                  <div key={category} className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium">{category}</span>
-                      <span className="text-muted-foreground">{count} ({percentage.toFixed(0)}%)</span>
-                    </div>
-                    <div className="bg-secondary rounded-full h-2 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-accent to-primary rounded-full transition-all"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <TabsContent value="trends" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                <LineChart className="w-4 h-4" />
+                XP Gained Over Time
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {xpGainedData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <RechartsLineChart data={xpGainedData}>
+                    <XAxis dataKey="date" stroke={tickColor} fontSize={12} />
+                    <YAxis stroke={tickColor} fontSize={12} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: theme === 'dark' ? '#1f2937' : '#f9fafb',
+                        borderColor: theme === 'dark' ? '#374151' : '#e5e7eb',
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '14px' }} />
+                    <Line type="monotone" dataKey="xp" stroke="hsl(var(--primary))" name="XP Gained" />
+                  </RechartsLineChart>
+                </ResponsiveContainer>
+              ) : (
+                <NoDataPlaceholder />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Top Skills */}
-      <Card className="backdrop-blur-sm bg-card/80 border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            Top Skills
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {topSkills.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground text-sm">
-              No skills yet
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {topSkills.map((skill, index) => (
-                <div key={skill.name} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
-                    #{index + 1}
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-semibold text-sm">{skill.name}</div>
-                    <div className="text-xs text-muted-foreground">Level {skill.level}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Hourly Heatmap */}
-      <Card className="backdrop-blur-sm bg-card/80 border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Clock className="w-5 h-5 text-accent" />
-            Time of Day Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-12 gap-1">
-            {hourlyStats.map((stat) => {
-              const opacity = stat.count === 0 ? 0.1 : 0.3 + (stat.intensity / 100) * 0.7;
-              return (
-                <div
-                  key={stat.hour}
-                  className="aspect-square rounded-sm relative group cursor-pointer"
-                  style={{
-                    backgroundColor: `hsl(var(--primary))`,
-                    opacity,
-                  }}
-                  title={`${stat.hour}:00 - ${stat.count} quests`}
-                >
-                  {stat.hour % 3 === 0 && (
-                    <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[8px] text-muted-foreground whitespace-nowrap">
-                      {stat.hour}h
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex justify-between items-center mt-8 text-xs text-muted-foreground">
-            <span>Less</span>
-            <div className="flex gap-1">
-              {[0.1, 0.3, 0.5, 0.7, 1].map((opacity) => (
-                <div
-                  key={opacity}
-                  className="w-4 h-4 rounded-sm"
-                  style={{
-                    backgroundColor: `hsl(var(--primary))`,
-                    opacity,
-                  }}
-                />
-              ))}
-            </div>
-            <span>More</span>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="breakdown" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                <PieChart className="w-4 h-4" />
+                Category Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {categoryData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <RechartsPieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) => {
+                        const p = typeof percent === 'number' ? percent : 0;
+                        return `${name} ${Math.round(p * 100)}%`;
+                      }}
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: theme === 'dark' ? '#1f2937' : '#f9fafb',
+                        borderColor: theme === 'dark' ? '#374151' : '#e5e7eb',
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '14px' }} />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              ) : (
+                <NoDataPlaceholder />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-};
+}

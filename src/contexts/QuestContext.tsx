@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { AppState, Quest, Skill, Reward, PowerUp, ActiveBuff } from '@/types/quest';
 import { toast } from 'sonner';
+import { xpForLevel } from '@/lib/utils';
 
 interface QuestContextType {
   state: AppState;
@@ -17,13 +18,12 @@ interface QuestContextType {
 
 const QuestContext = createContext<QuestContextType | undefined>(undefined);
 
-const xpForLevel = (level: number) => Math.floor(100 * Math.pow(1.5, level - 1));
 const goldForQuest = (xp: number) => Math.ceil(xp / 8);
 
 const PRIORITY_MULTIPLIER = {
   low: 1,
-  medium: 1.1,
-  high: 1.25,
+  medium: 1.5,
+  high: 2,
 };
 
 const getDefaultState = (): AppState => ({

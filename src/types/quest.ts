@@ -50,6 +50,19 @@ export interface Reward {
   cost: number;
 }
 
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  icon: string;
+}
+
+export interface UnlockedAchievement {
+  id: string;
+  unlockedAt: string;
+}
+
 export interface AppState {
   player: PlayerStats;
   quests: Quest[];
@@ -57,6 +70,7 @@ export interface AppState {
   skills: Record<string, Skill>;
   rewards: Reward[];
   activeBuffs: ActiveBuff[];
+  achievements: UnlockedAchievement[];
   characterName: string;
   characterClass: 'warrior' | 'mage' | 'ranger';
 }

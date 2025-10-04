@@ -2,12 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useQuest } from '@/contexts/QuestContext';
 import { Sparkles } from 'lucide-react';
-
-const xpForLevel = (level: number) => Math.floor(100 * Math.pow(1.5, level - 1));
+import { xpForLevel } from '@/lib/utils';
+import { Skill } from '@/types/quest';
 
 export const SkillsPanel = () => {
   const { state } = useQuest();
-  const skills = Object.values(state.skills);
+  const skills: Skill[] = Object.values(state.skills);
 
   return (
     <Card className="backdrop-blur-sm bg-card/80 border-primary/20">
@@ -34,12 +34,10 @@ export const SkillsPanel = () => {
                     <h4 className="font-semibold text-sm">{skill.name}</h4>
                     <span className="text-xs text-muted-foreground">Lvl {skill.level}</span>
                   </div>
-                  <Progress value={progress} className="h-2 bg-secondary">
-                    <div 
-                      className="h-full bg-gradient-to-r from-accent to-primary rounded-full transition-all" 
-                      style={{ width: `${progress}%` }} 
-                    />
-                  </Progress>
+                  <Progress value={progress} className="h-2 bg-secondary" />
+                  <div className="text-xs text-muted-foreground text-right">
+                    {Math.round(skill.xp)} / {requiredXp} XP
+                  </div>
                 </div>
               );
             })}

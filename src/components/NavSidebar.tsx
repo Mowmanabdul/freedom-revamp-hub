@@ -1,10 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
-import { LayoutDashboard, ShoppingCart, History, LineChart } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, History, LineChart, Settings } from "lucide-react";
+import { NavItem } from "@/App";
 
-type NavItem = "Dashboard" | "Shop" | "History" | "Analytics";
-
-interface SidebarProps {
+interface NavSidebarProps {
   activePage: NavItem;
   setActivePage: (page: NavItem) => void;
 }
@@ -16,7 +15,8 @@ const navItems = [
   { name: "Analytics", icon: LineChart },
 ] as const;
 
-export function Sidebar({ activePage, setActivePage }: SidebarProps) {
+
+export function NavSidebar({ activePage, setActivePage }: NavSidebarProps) {
   return (
     <aside className="w-full h-full flex flex-col p-4 border-r bg-card/80 backdrop-blur-sm">
       <div className="flex items-center justify-between mb-8">
